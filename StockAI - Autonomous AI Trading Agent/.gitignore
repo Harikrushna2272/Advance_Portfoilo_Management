@@ -1,0 +1,11 @@
+.env
+.venv
+.STREAMLIT_UI.md
+.QUICK_START_UI.md
+.NEW_WORKFLOW.md
+.requirements.txt
+.env.example
+.agents
+.models/
+.data/
+.utils/
