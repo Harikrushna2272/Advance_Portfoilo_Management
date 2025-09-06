@@ -7,7 +7,7 @@
 The system follows a **4 Agents → 5 RL Models → Portfolio Manager** workflow:
 
 1. **4 Analytical Agents** (no weights) provide market insights
-2. **5 RL Models** (20% each) generate machine learning predictions  
+2. **5 RL Models** generate machine learning predictions  
 3. **Portfolio Manager** combines all signals and determines final quantity
 
 ## ✨ Key Features
@@ -378,7 +378,7 @@ This system is for educational and research purposes. Always test with paper tra
 
 ## Reference : 
 
-- **help**: [GitHub Discussions](https://github.com/virattt/ai-hedge-fund)
+- **reference**: [GitHub Discussions](https://github.com/virattt/ai-hedge-fund)
 
 
 ## 📄 License
