@@ -9,4 +9,4 @@
 .models/
 .data/
 .utils/
-.SINGLE_RL_MODEL/
+.SINGLE_RL_MODELS.ipynb 
