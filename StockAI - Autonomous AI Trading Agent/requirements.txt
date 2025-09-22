@@ -44,8 +44,8 @@ fastapi>=0.85.0
 uvicorn>=0.18.0
 
 # Streamlit UI
-streamlit>=1.28.0
-plotly>=5.15.0
+streamlit
+plotly
 
 # Development & Testing
 pytest>=7.0.0
