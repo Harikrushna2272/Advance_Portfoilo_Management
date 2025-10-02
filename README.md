@@ -1,6 +1,10 @@
 # StockAI: Advanced Multi-Agent Trading System
 
-**StockAI** is a sophisticated AI-driven trading system that combines 4 analytical agents with a 5-model ensemble reinforcement learning approach for intelligent trade decision-making. The system processes real-time market data, performs comprehensive analysis, and executes quantity-based trades using the Alpaca API.
+**StockAI** is a sophisticate   │   ├── utils/                      # Utilities
+│   │   ├── __init__.py
+│   │   ├── logger.py               # Logging utilities
+│   │   ├── validators.py           # Input validation
+│   │   └── knowledge_graph.py      # Knowledge graph utilities-driven trading system that combines 4 analytical agents with a 5-model ensemble reinforcement learning approach for intelligent trade decision-making. The system processes real-time market data, performs comprehensive analysis, and executes quantity-based trades using the Alpaca API.
 
 ## 🎯 System Architecture
 
@@ -21,8 +25,19 @@ The system follows a **4 Agents → 5 RL Models → Portfolio Manager** workflow
 - **Fundamentals Agent:** Company financial health analysis
 - **Technicals Agent:** Price action and pattern recognition
 - **Valuation Agent:** Intrinsic value and DCF analysis
-- **Sentiment Agent:** Insider trading sentiment analysis
+- **Sentiment Agent:** Advanced sentiment analysis with knowledge graphs
+  - Company relationships and network effects
+  - News sentiment analysis using NLP
+  - Insider trading patterns
+  - Weighted multi-factor sentiment scoring
 - **Risk Manager:** Portfolio risk assessment
+
+### **Knowledge Graph Integration**
+- **Company Relationships:** Maps connections between companies
+- **News Impact Analysis:** NLP-based sentiment extraction
+- **Network Effect Modeling:** Relationship strength calculation
+- **Multi-Source Sentiment:** Combines news, relationships, and insider data
+- **Weighted Decision Making:** 60% knowledge graph, 40% insider trading
 
 ### **5-Model RL Ensemble**
 - **SAC (Soft Actor-Critic):** Continuous action space optimization
@@ -135,7 +150,7 @@ StockAI - Autonomous AI Trading Agent/
    make install
    ```
    
-   **Note:** Make sure to install TA-Lib separately if you encounter issues:
+   **Note:** Make sure to install TA-Lib and other dependencies separately if you encounter issues:
    ```bash
    # On macOS
    brew install ta-lib
@@ -144,6 +159,9 @@ StockAI - Autonomous AI Trading Agent/
    # On Ubuntu/Debian
    sudo apt-get install libta-lib-dev
    pip install TA-Lib
+   
+   # Install spaCy language model (required for sentiment analysis)
+   python -m spacy download en_core_web_sm
    ```
 
 3. **Configure Environment:**
@@ -169,7 +187,12 @@ StockAI - Autonomous AI Trading Agent/
 - **Fundamentals:** ROE, margins, growth metrics
 - **Technicals:** Trend, momentum, volatility analysis
 - **Valuation:** DCF, owner earnings, market comparison
-- **Sentiment:** Insider trading data analysis
+- **Sentiment:** 
+  - Knowledge graph-based relationship analysis
+  - News sentiment using NLP
+  - Insider trading patterns
+  - Network effect calculations
+  - Weighted sentiment scoring (60% KG, 40% insider)
 - **Risk:** Position limits and portfolio assessment
 
 ### **Step 3: RL Ensemble Prediction**

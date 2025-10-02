@@ -27,6 +27,8 @@ help:
 install:
 	@echo "Installing dependencies..."
 	pip install -r requirements.txt
+	@echo "Installing spaCy language model..."
+	python -m spacy download en_core_web_sm
 
 dev:
 	@echo "Running in development mode..."
