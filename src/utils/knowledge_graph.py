@@ -40,14 +40,95 @@ class CompanyKnowledgeGraph:
                               strength=rel["strength"])
     
     def _analyze_news_sentiment(self, text: str) -> float:
-        """Analyze sentiment of news text using spaCy."""
+        """Analyze sentiment of news text using spaCy.
+        
+        Uses NLP features including:
+        - Named Entity Recognition (NER)
+        - Part-of-speech tagging
+        - Dependency parsing
+        - Word vectors for semantic analysis
+        """
         doc = self.nlp(text)
-        # Simple sentiment scoring based on positive/negative words
-        sentiment_score = 0
-        for token in doc:
-            if token.pos_ in ["ADJ", "VERB"]:
-                # Add more sophisticated sentiment scoring here
-                pass
+        sentiment_score = 0.0
+        
+        # Initialize sentiment dictionaries
+        financial_pos_words = {
+            "surge", "gain", "rise", "improve", "profit", "growth", "exceed",
+            "outperform", "breakthrough", "innovative", "successful", "positive"
+        }
+        financial_neg_words = {
+            "decline", "drop", "fall", "loss", "debt", "risk", "downgrade",
+            "underperform", "recession", "negative", "bankruptcy", "litigation"
+        }
+        
+        # Weight multipliers for different aspects
+        ENTITY_WEIGHT = 1.5      # Weight for named entities
+        NEGATION_WEIGHT = -1.0   # Weight for negation
+        INTENSITY_WEIGHT = 1.2    # Weight for intensity modifiers
+        
+        # Analyze each sentence
+        for sent in doc.sents:
+            sent_score = 0.0
+            negation = False
+            intensity = 1.0
+            
+            # Check for named entities (companies, organizations)
+            entities = [ent for ent in sent.ents if ent.label_ in ["ORG", "PERSON", "GPE"]]
+            entity_multiplier = ENTITY_WEIGHT if entities else 1.0
+            
+            # Analyze tokens in sentence
+            for token in sent:
+                # Check for negation
+                if token.dep_ == "neg":
+                    negation = True
+                    continue
+                
+                # Check for intensity modifiers
+                if token.pos_ == "ADV" and token.head.pos_ in ["ADJ", "VERB"]:
+                    if token.text.lower() in ["very", "highly", "extremely", "significantly"]:
+                        intensity = INTENSITY_WEIGHT
+                
+                # Get base word sentiment
+                word_score = 0.0
+                if token.text.lower() in financial_pos_words:
+                    word_score = 1.0
+                elif token.text.lower() in financial_neg_words:
+                    word_score = -1.0
+                
+                # Apply dependency-based analysis
+                if token.pos_ in ["ADJ", "VERB"]:
+                    # Check for subject-verb or verb-object relationships
+                    if token.dep_ in ["ROOT", "acomp", "xcomp"]:
+                        word_score *= 1.2  # Boost score for main predicates
+                
+                # Consider word vectors for unknown words
+                if word_score == 0 and token.has_vector:
+                    # Compare with known positive/negative words using vector similarity
+                    pos_sim = max([token.similarity(self.nlp(pos_word)) 
+                                 for pos_word in list(financial_pos_words)[:5]])
+                    neg_sim = max([token.similarity(self.nlp(neg_word)) 
+                                 for neg_word in list(financial_neg_words)[:5]])
+                    if pos_sim > 0.6:  # Threshold for similarity
+                        word_score = pos_sim
+                    elif neg_sim > 0.6:
+                        word_score = -neg_sim
+                
+                # Apply modifiers
+                word_score *= intensity
+                if negation:
+                    word_score *= NEGATION_WEIGHT
+                
+                sent_score += word_score
+            
+            # Apply entity multiplier to sentence score
+            sent_score *= entity_multiplier
+            sentiment_score += sent_score
+        
+        # Normalize score to range [-1, 1]
+        num_sents = len(list(doc.sents))
+        if num_sents > 0:
+            sentiment_score = max(min(sentiment_score / num_sents, 1.0), -1.0)
+            
         return sentiment_score
     
     def get_sentiment_score(self) -> Tuple[str, float]:
