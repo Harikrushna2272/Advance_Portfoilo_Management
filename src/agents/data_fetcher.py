@@ -3,7 +3,13 @@ import time
 import threading
 import pandas as pd
 import websocket
-from config import API_KEY, API_SECRET
+from src.config.settings import get_settings
+
+# Get API credentials from settings
+_settings = get_settings()
+API_KEY = _settings.api_key
+API_SECRET = _settings.api_secret
+
 
 class DataFetcher:
     def __init__(self, symbol):
@@ -20,26 +26,16 @@ class DataFetcher:
             if item.get("T") == "t":  # Trade update
                 # Update the latest data with this trade update
                 with self.lock:
-                    self.latest_data = {
-                        "Close": item.get("p"),
-                        "Volume": item.get("s")
-                    }
+                    self.latest_data = {"Close": item.get("p"), "Volume": item.get("s")}
                 # You can optionally print or process this update further
                 # print(f"Updated data for {self.symbol}: {self.latest_data}")
 
     def on_open(self, ws):
         self.connected = True
         print("WebSocket connected, subscribing to live data...")
-        auth_data = {
-            "action": "auth",
-            "key": API_KEY,
-            "secret": API_SECRET
-        }
+        auth_data = {"action": "auth", "key": API_KEY, "secret": API_SECRET}
         ws.send(json.dumps(auth_data))
-        subscribe_message = {
-            "action": "subscribe",
-            "trades": [self.symbol]
-        }
+        subscribe_message = {"action": "subscribe", "trades": [self.symbol]}
         ws.send(json.dumps(subscribe_message))
 
     def on_error(self, ws, error):
@@ -55,7 +51,7 @@ class DataFetcher:
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
-            on_close=self.on_close
+            on_close=self.on_close,
         )
         # Run the WebSocket in a separate daemon thread
         thread = threading.Thread(target=self.socket.run_forever)
@@ -66,15 +62,21 @@ class DataFetcher:
         with self.lock:
             if self.latest_data is not None:
                 # Create a DataFrame with aggregated values (High/Low set as Close since only one value is available)
-                df = pd.DataFrame([{
-                    "Close": self.latest_data["Close"],
-                    "Volume": self.latest_data["Volume"],
-                    "High": self.latest_data["Close"],
-                    "Low": self.latest_data["Close"]
-                }])
+                df = pd.DataFrame(
+                    [
+                        {
+                            "Close": self.latest_data["Close"],
+                            "Open": self.latest_data["Open"],
+                            "Volume": self.latest_data["Volume"],
+                            "High": self.latest_data["Close"],
+                            "Low": self.latest_data["Close"],
+                        }
+                    ]
+                )
                 return df
             else:
                 return None
+
 
 def get_stock_data(symbol):
     # Instantiate and start the continuous data fetcher
@@ -90,7 +92,9 @@ def get_stock_data(symbol):
     # Return the most recent data immediately (or None if not available yet)
     return fetcher.get_latest_data()
 
+
 if __name__ == "__main__":
     import pprint
+
     data = get_stock_data("AAPL")
     pprint.pprint(data)

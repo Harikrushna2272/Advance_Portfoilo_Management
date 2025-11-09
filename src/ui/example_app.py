@@ -15,9 +15,9 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from config.settings import get_settings
-from utils.logger import setup_logger
+from src.utils.logger import setup_logger
 from core.decision_engine import DecisionEngine
-from agents.execution_agent import ExecutionAgent
+from src.agents.execution_agent import ExecutionAgent
 
 # Configure page
 st.set_page_config(

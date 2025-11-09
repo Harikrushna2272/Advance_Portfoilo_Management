@@ -3,7 +3,7 @@ import numpy as np
 from datetime import datetime
 
 # Import the API functions from ai-hedge-fund
-from utils import api as hedge_api
+from src.tools import api as hedge_api
 
 def analyze_risk(stock, start_date, end_date, portfolio):
     """Run risk management analysis for a single stock."""
