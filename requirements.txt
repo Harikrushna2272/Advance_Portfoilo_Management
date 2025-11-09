@@ -1,53 +1,76 @@
 # StockAI - Advanced Multi-Agent Trading System
-# Compatible dependencies for uv package manager
+# Python Dependencies
 
-# Core Data Processing
+# ============================================================================
+# CORE DATA PROCESSING
+# ============================================================================
 pandas>=1.5.0,<2.4.0
 numpy>=1.26.0,<2.0.0  # Must be <2.0 for langchain compatibility
 
-# AI & LangChain Integration
+# ============================================================================
+# AI & LANGCHAIN INTEGRATION
+# ============================================================================
 langchain==0.3.0
 langchain-openai==0.3.0
 langgraph==0.2.56
 langchain-core>=0.3.0,<0.4.0
 langchain-text-splitters>=0.3.0,<0.4.0
 
-# Machine Learning & Reinforcement Learning
+# ============================================================================
+# MACHINE LEARNING & REINFORCEMENT LEARNING
+# ============================================================================
 stable-baselines3>=2.0.0,<3.0.0
-gymnasium>=0.29.0  # Use gymnasium instead of gym
+gymnasium>=0.29.0  # Use gymnasium instead of deprecated gym
 joblib>=1.2.0
 
-# Technical Analysis Conflicts- Using manual calculations with avoid conflicts
-#  numpyand requirements
-#pandas-ta Note: Data preprocessor has manual fallback calculationscommented out due to numpy version conflicts
-# The data preprocessor has built-in manual fallback calculations
-
-# API & Web Communication
+# ============================================================================
+# API & WEB COMMUNICATION
+# ============================================================================
 alpaca-trade-api>=3.0.0
-# yfinance commented out - conflicts with alpaca websockets requirement
-# Use alternative data sources or install separately if needed
 websocket-client>=1.4.0
 requests>=2.28.0
 
-# Data Processing & Analysis
+# ============================================================================
+# DATA PROCESSING & ANALYSIS
+# ============================================================================
 scikit-learn>=1.1.0
 scipy>=1.9.0
 
-# Natural Language Processing (for sentiment analysis)
+# ============================================================================
+# NATURAL LANGUAGE PROCESSING (for sentiment analysis)
+# ============================================================================
 textblob>=0.17.0
-# spacy>=3.5.0  # Heavy dependency, install separately if needed
 networkx>=3.0.0
 
-# Configuration & Utilities
+# ============================================================================
+# CONFIGURATION & UTILITIES
+# ============================================================================
 pydantic>=2.0.0,<3.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 
-# CLI & Display
+# ============================================================================
+# CLI & DISPLAY
+# ============================================================================
 colorama>=0.4.6
 questionary>=2.1.0
 rich>=13.9.4
 tabulate>=0.9.0
+
+# ============================================================================
+# STREAMLIT UI
+# ============================================================================
+streamlit>=1.28.0
+plotly>=5.14.0
+pyarrow>=14.0.0  # Required for DataFrame serialization in Streamlit
+
+# ============================================================================
+# OPTIONAL DEPENDENCIES
+# ============================================================================
+
+# Technical Analysis (optional - system has manual fallback calculations)
+# Note: TA-Lib requires separate system library installation
+# pandas-ta>=0.3.14
 
 # Database (optional - install if using database features)
 # sqlalchemy>=1.4.0
@@ -62,10 +85,6 @@ tabulate>=0.9.0
 # fastapi>=0.85.0
 # uvicorn>=0.18.0
 
-# Streamlit UI (optional)
-# streamlit
-# plotly
-
 # Development & Testing (optional)
 # pytest>=7.0.0
 # pytest-asyncio>=0.20.0
@@ -78,7 +97,7 @@ tabulate>=0.9.0
 # prometheus-client>=0.14.0
 # structlog>=22.1.0
 
-# Jupyter for development (optional)
+# Jupyter Development (optional)
 # jupyter>=1.0.0
 # matplotlib>=3.9.2
 # seaborn>=0.11.0
