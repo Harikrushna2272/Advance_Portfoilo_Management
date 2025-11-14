@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import numpy as np
 from typing import Dict, List
 
+# No external dependencies needed - everything is in session state
+
 
 def render_dashboard():
     """Render the main dashboard page with real-time updates."""
@@ -127,26 +129,8 @@ def render_portfolio_value_chart():
     """Render portfolio value over time chart."""
     st.markdown("### 📈 Portfolio Performance")
 
-    # Generate sample historical data (in production, fetch from database)
-    if "portfolio_history" not in st.session_state:
-        dates = pd.date_range(
-            start=datetime.now() - timedelta(days=30), end=datetime.now(), freq="D"
-        )
-        initial_value = 100000
-
-        # Simulate portfolio growth with some volatility
-        np.random.seed(42)
-        returns = np.random.normal(0.001, 0.02, len(dates))
-        values = [initial_value]
-
-        for ret in returns[1:]:
-            values.append(values[-1] * (1 + ret))
-
-        st.session_state.portfolio_history = pd.DataFrame(
-            {"Date": dates, "Value": values}
-        )
-
-    df = st.session_state.portfolio_history
+    # Use sample data for visualization (no database needed)
+    df = _create_sample_portfolio_history()
 
     # Create the chart
     fig = go.Figure()
@@ -302,19 +286,8 @@ def render_daily_pnl_chart():
     """Render daily P&L chart."""
     st.markdown("### 💵 Daily P&L")
 
-    # Generate sample P&L data
-    if "daily_pnl_history" not in st.session_state:
-        dates = pd.date_range(
-            start=datetime.now() - timedelta(days=14), end=datetime.now(), freq="D"
-        )
-        np.random.seed(43)
-        pnl_values = np.random.normal(200, 500, len(dates))
-
-        st.session_state.daily_pnl_history = pd.DataFrame(
-            {"Date": dates, "PnL": pnl_values}
-        )
-
-    df = st.session_state.daily_pnl_history
+    # Use sample data for visualization
+    df = _create_sample_pnl_history()
 
     # Create bar chart with colors based on positive/negative
     colors = ["#28a745" if pnl >= 0 else "#dc3545" for pnl in df["PnL"]]
@@ -348,10 +321,40 @@ def render_daily_pnl_chart():
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _create_sample_portfolio_history():
+    """Create sample portfolio history for display."""
+    dates = pd.date_range(
+        start=datetime.now() - timedelta(days=30), end=datetime.now(), freq="D"
+    )
+    initial_value = 100000
+
+    # Simulate portfolio growth with some volatility
+    np.random.seed(42)
+    returns = np.random.normal(0.001, 0.02, len(dates))
+    values = [initial_value]
+
+    for ret in returns[1:]:
+        values.append(values[-1] * (1 + ret))
+
+    return pd.DataFrame({"Date": dates, "Value": values})
+
+
+def _create_sample_pnl_history():
+    """Create sample P&L history for display."""
+    dates = pd.date_range(
+        start=datetime.now() - timedelta(days=14), end=datetime.now(), freq="D"
+    )
+    np.random.seed(43)
+    pnl_values = np.random.normal(200, 500, len(dates))
+
+    return pd.DataFrame({"Date": dates, "PnL": pnl_values})
+
+
 def render_recent_decisions():
     """Render recent trading decisions table."""
     st.markdown("### 🔄 Recent Trading Decisions")
 
+    # Load from session state
     recent_decisions = st.session_state.get("recent_decisions", [])
 
     # If no decisions, show sample data

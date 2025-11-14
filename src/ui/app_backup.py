@@ -33,160 +33,16 @@ from pages.analysis import render_analysis_page
 from pages.portfolio import render_portfolio_page
 from pages.monitoring import render_monitoring_page
 
-# NO external dependencies - everything self-contained
-SYSTEM_AVAILABLE = True
+# Import simple state manager (no external dependencies)
+try:
+    from ui import simple_state
 
-# Dummy prices for realistic feel
-DUMMY_PRICES = {
-    "AAPL": 182.50,
-    "TSLA": 245.80,
-    "GOOGL": 140.50,
-    "MSFT": 420.15,
-    "AMZN": 175.75,
-    "NVDA": 495.50,
-    "META": 485.30,
-    "NFLX": 625.40,
-    "AMD": 155.20,
-    "INTC": 42.80,
-}
-
-
-def get_stock_price(symbol):
-    """Get price for a symbol."""
-    return DUMMY_PRICES.get(symbol, 100.0)
-
-
-def execute_trade(symbol, action, quantity):
-    """Execute a trade and update portfolio - WORKING VERSION."""
-    price = get_stock_price(symbol)
-
-    if action == "BUY":
-        cost = quantity * price
-        if st.session_state.cash >= cost:
-            st.session_state.cash -= cost
-
-            # Update positions
-            if symbol in st.session_state.positions:
-                pos = st.session_state.positions[symbol]
-                old_shares = pos["shares"]
-                old_cost = pos["avg_cost"]
-                new_shares = old_shares + quantity
-                new_avg_cost = ((old_shares * old_cost) + cost) / new_shares
-
-                st.session_state.positions[symbol] = {
-                    "shares": new_shares,
-                    "avg_cost": new_avg_cost,
-                }
-            else:
-                st.session_state.positions[symbol] = {
-                    "shares": quantity,
-                    "avg_cost": price,
-                }
-
-            # Add to trade history
-            st.session_state.trade_history.insert(
-                0,
-                {
-                    "timestamp": datetime.now(),
-                    "symbol": symbol,
-                    "signal": "BUY",
-                    "action": "BUY",
-                    "quantity": quantity,
-                    "price": price,
-                    "total": cost,
-                    "confidence": 100.0,
-                    "executed": True,
-                    "reasoning": "Manual trade from UI",
-                },
-            )
-
-            # Add to recent decisions
-            st.session_state.recent_decisions.insert(
-                0,
-                {
-                    "timestamp": datetime.now(),
-                    "symbol": symbol,
-                    "signal": "BUY",
-                    "confidence": 100.0,
-                    "quantity": quantity,
-                    "price": price,
-                    "executed": True,
-                    "reasoning": "Manual trade execution",
-                },
-            )
-
-            st.session_state.total_trades += 1
-            st.session_state.successful_trades += 1
-            st.session_state.total_decisions += 1
-
-            update_portfolio_value()
-            return True, f"✅ Bought {quantity} {symbol} @ ${price:.2f} = ${cost:,.2f}"
-        else:
-            return (
-                False,
-                f"❌ Insufficient cash. Need ${cost:,.2f}, have ${st.session_state.cash:,.2f}",
-            )
-
-    elif action == "SELL":
-        if symbol in st.session_state.positions:
-            pos = st.session_state.positions[symbol]
-            if pos["shares"] >= quantity:
-                proceeds = quantity * price
-                st.session_state.cash += proceeds
-
-                pos["shares"] -= quantity
-                if pos["shares"] == 0:
-                    del st.session_state.positions[symbol]
-
-                # Add to trade history
-                st.session_state.trade_history.insert(
-                    0,
-                    {
-                        "timestamp": datetime.now(),
-                        "symbol": symbol,
-                        "signal": "SELL",
-                        "action": "SELL",
-                        "quantity": quantity,
-                        "price": price,
-                        "total": proceeds,
-                        "confidence": 100.0,
-                        "executed": True,
-                        "reasoning": "Manual trade from UI",
-                    },
-                )
-
-                # Add to recent decisions
-                st.session_state.recent_decisions.insert(
-                    0,
-                    {
-                        "timestamp": datetime.now(),
-                        "symbol": symbol,
-                        "signal": "SELL",
-                        "confidence": 100.0,
-                        "quantity": quantity,
-                        "price": price,
-                        "executed": True,
-                        "reasoning": "Manual trade execution",
-                    },
-                )
-
-                st.session_state.total_trades += 1
-                st.session_state.successful_trades += 1
-                st.session_state.total_decisions += 1
-
-                update_portfolio_value()
-                return (
-                    True,
-                    f"✅ Sold {quantity} {symbol} @ ${price:.2f} = ${proceeds:,.2f}",
-                )
-            else:
-                return (
-                    False,
-                    f"❌ Not enough shares. Have {pos['shares']}, trying to sell {quantity}",
-                )
-        else:
-            return False, f"❌ No position in {symbol}"
-
+    STATE_MANAGER = simple_state
+    SYSTEM_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: Could not initialize state manager: {e}")
+    STATE_MANAGER = None
+    SYSTEM_AVAILABLE = False
 
 # Custom CSS for professional look
 st.markdown(
@@ -436,104 +292,66 @@ st.markdown(
 
 # Initialize session state
 def initialize_session_state():
-    """Initialize session state variables - simple in-memory approach."""
+    """Initialize session state variables - now loads from state manager."""
     if "initialized" not in st.session_state:
         st.session_state.initialized = True
 
-        # Trading state
-        st.session_state.trading_active = False
-        st.session_state.last_update = datetime.now()
-        st.session_state.cycle_count = 0
-        st.session_state.total_decisions = 0
-        st.session_state.total_trades = 0
-        st.session_state.successful_trades = 0
+    # Load real-time state from simple state manager
+    if STATE_MANAGER is not None:
+        try:
+            # Get current state from state manager
+            current_state = STATE_MANAGER.load_state()
 
-        # Portfolio state - simple in-memory
-        st.session_state.cash = 100000.0
-        st.session_state.positions = {}
-        st.session_state.trade_history = []
+            # Update session state with real data
+            st.session_state.trading_active = current_state.get("trading_active", False)
+            st.session_state.last_update = datetime.fromisoformat(
+                current_state.get("timestamp", datetime.now().isoformat())
+            )
+            st.session_state.cycle_count = current_state.get("cycle_count", 0)
+            st.session_state.total_decisions = current_state.get("total_decisions", 0)
+            st.session_state.total_trades = current_state.get("total_trades", 0)
+            st.session_state.successful_trades = current_state.get(
+                "successful_trades", 0
+            )
 
-        # Legacy portfolio dict for UI compatibility
-        st.session_state.portfolio = {
-            "cash": 100000.0,
-            "positions": {},
-            "cost_basis": {},
-            "total_value": 100000.0,
-            "total_return": 0.0,
-            "total_return_pct": 0.0,
-        }
+            # Portfolio state
+            st.session_state.portfolio = current_state.get("portfolio", {})
 
-        # System state
+            # System state
+            st.session_state.system_health = current_state.get("system_health", {})
 
-        st.session_state.system_health = {
-            "api_status": "Disconnected",
-            "database_status": "Offline",
-            "models_loaded": 0,
-            "total_models": 5,
-            "memory_usage": 0,
-            "cpu_usage": 0,
-        }
+            # Recent decisions
+            st.session_state.recent_decisions = current_state.get(
+                "recent_decisions", []
+            )
 
-        # Recent decisions
-        st.session_state.recent_decisions = []
+            # Analytics
+            st.session_state.analytics = current_state.get("analytics", {})
 
-        # Analytics
-        st.session_state.analytics = {
-            "daily_pnl": 0.0,
-            "weekly_pnl": 0.0,
-            "monthly_pnl": 0.0,
-            "sharpe_ratio": 0.0,
-            "max_drawdown": 0.0,
-            "win_rate": 0.0,
-        }
+            # Settings
+            st.session_state.settings = current_state.get("settings", {})
 
-        # Settings
-        st.session_state.settings = {
-            "stock_list": ["AAPL", "TSLA", "GOOGL"],
-            "confidence_threshold": 60,
-            "base_quantity": 100,
-            "max_quantity": 500,
-            "cycle_interval": 60,
-            "auto_refresh": True,
-            "refresh_interval": 5,
-        }
+            # Portfolio history
+            st.session_state.portfolio_history = None  # Will be loaded on demand
+            st.session_state.daily_pnl_history = None  # Will be loaded on demand
+
+        except Exception as e:
+            st.error(f"Error loading state from state manager: {e}")
+            # Fall back to default values
+            _initialize_default_state()
+    else:
+        # No state manager available, use defaults
+        _initialize_default_state()
 
 
 def update_portfolio_value():
-    """Update total portfolio value and sync with legacy portfolio dict."""
-    # Calculate positions value
+    """Update total portfolio value."""
     positions_value = sum(
         pos["shares"] * get_stock_price(symbol)
         for symbol, pos in st.session_state.positions.items()
     )
-
-    # Update legacy portfolio dict for UI compatibility
-    st.session_state.portfolio["cash"] = st.session_state.cash
     st.session_state.portfolio["total_value"] = st.session_state.cash + positions_value
-
-    # Sync positions to legacy format
-    st.session_state.portfolio["positions"] = {}
-    for symbol, pos in st.session_state.positions.items():
-        current_price = get_stock_price(symbol)
-        market_value = pos["shares"] * current_price
-        cost_basis = pos["shares"] * pos["avg_cost"]
-        unrealized_pnl = market_value - cost_basis
-        unrealized_pnl_pct = (
-            (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0
-        )
-
-        st.session_state.portfolio["positions"][symbol] = {
-            "shares": pos["shares"],
-            "avg_cost": pos["avg_cost"],
-            "current_price": current_price,
-            "market_value": market_value,
-            "cost_basis": cost_basis,
-            "unrealized_pnl": unrealized_pnl,
-            "unrealized_pnl_pct": unrealized_pnl_pct,
-            "day_change": 0.0,  # Dummy value
-            "day_change_pct": 0.0,  # Dummy value
-        }
-        st.session_state.portfolio["cost_basis"][symbol] = cost_basis
+    st.session_state.portfolio["cash"] = st.session_state.cash
 
     # Calculate return
     initial = 100000.0
@@ -543,6 +361,60 @@ def update_portfolio_value():
     st.session_state.portfolio["total_return_pct"] = (
         st.session_state.portfolio["total_return"] / initial
     ) * 100
+
+
+def _initialize_default_state():
+    """Initialize default state when state manager is not available."""
+    st.session_state.trading_active = False
+    st.session_state.last_update = datetime.now()
+    st.session_state.cycle_count = 0
+    st.session_state.total_decisions = 0
+    st.session_state.total_trades = 0
+    st.session_state.successful_trades = 0
+
+    # Portfolio state
+    st.session_state.portfolio = {
+        "cash": 100000.0,
+        "positions": {},
+        "cost_basis": {},
+        "total_value": 100000.0,
+        "total_return": 0.0,
+        "total_return_pct": 0.0,
+    }
+
+    # System state
+    st.session_state.system_health = {
+        "api_status": "Disconnected",
+        "database_status": "Offline",
+        "models_loaded": 0,
+        "total_models": 5,
+        "memory_usage": 0,
+        "cpu_usage": 0,
+    }
+
+    # Recent decisions
+    st.session_state.recent_decisions = []
+
+    # Analytics
+    st.session_state.analytics = {
+        "daily_pnl": 0.0,
+        "weekly_pnl": 0.0,
+        "monthly_pnl": 0.0,
+        "sharpe_ratio": 0.0,
+        "max_drawdown": 0.0,
+        "win_rate": 0.0,
+    }
+
+    # Settings
+    st.session_state.settings = {
+        "stock_list": ["AAPL", "TSLA", "GOOGL"],
+        "confidence_threshold": 60,
+        "base_quantity": 100,
+        "max_quantity": 500,
+        "cycle_interval": 60,
+        "auto_refresh": True,
+        "refresh_interval": 5,
+    }
 
 
 def render_header():
@@ -620,27 +492,16 @@ def render_sidebar():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("▶️ Start", type="primary", use_container_width=True):
-                import random
-
                 st.session_state.trading_active = True
                 st.session_state.system_health["api_status"] = "Connected"
-                st.session_state.system_health["database_status"] = "Healthy"
                 st.session_state.system_health["models_loaded"] = 5
-                st.session_state.system_health["memory_usage"] = random.randint(55, 75)
-                st.session_state.system_health["cpu_usage"] = random.randint(25, 45)
                 st.success("✅ Trading system started!")
                 st.rerun()
 
         with col2:
             if st.button("⏹️ Stop", type="secondary", use_container_width=True):
-                import random
-
                 st.session_state.trading_active = False
                 st.session_state.system_health["api_status"] = "Disconnected"
-                st.session_state.system_health["database_status"] = "Offline"
-                st.session_state.system_health["models_loaded"] = 0
-                st.session_state.system_health["memory_usage"] = random.randint(35, 55)
-                st.session_state.system_health["cpu_usage"] = random.randint(10, 25)
                 st.warning("⏸️ Trading system stopped!")
                 st.rerun()
 
@@ -846,14 +707,38 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # Auto-refresh logic (optional - disabled by default to avoid constant reloads)
-    # The state is already in memory via st.session_state, no need to reload
-    # Uncomment below if you want auto-refresh every N seconds
-    # if st.session_state.settings.get("auto_refresh", False):
-    #     import time
-    #     time.sleep(st.session_state.settings.get("refresh_interval", 5))
-    #     st.session_state.last_update = datetime.now()
-    #     st.rerun()
+    # Auto-refresh logic - reload state from state manager
+    if st.session_state.settings.get("auto_refresh", False):
+        import time
+
+        time.sleep(st.session_state.settings.get("refresh_interval", 5))
+
+        # Reload state from state manager
+        if STATE_MANAGER is not None:
+            try:
+                current_state = STATE_MANAGER.load_state()
+                st.session_state.trading_active = current_state.get(
+                    "trading_active", False
+                )
+                st.session_state.cycle_count = current_state.get("cycle_count", 0)
+                st.session_state.total_decisions = current_state.get(
+                    "total_decisions", 0
+                )
+                st.session_state.total_trades = current_state.get("total_trades", 0)
+                st.session_state.successful_trades = current_state.get(
+                    "successful_trades", 0
+                )
+                st.session_state.portfolio = current_state.get("portfolio", {})
+                st.session_state.system_health = current_state.get("system_health", {})
+                st.session_state.recent_decisions = current_state.get(
+                    "recent_decisions", []
+                )
+                st.session_state.analytics = current_state.get("analytics", {})
+                st.session_state.last_update = datetime.now()
+            except Exception as e:
+                st.error(f"Error refreshing state: {e}")
+
+        st.rerun()
 
 
 if __name__ == "__main__":

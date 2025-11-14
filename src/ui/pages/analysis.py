@@ -94,28 +94,110 @@ def render_analysis_controls():
             st.rerun()
 
 
+def get_stock_specific_analysis(stock: str):
+    """Get stock-specific analysis data for different stocks."""
+
+    analyses = {
+        "AAPL": {
+            "Fundamentals": {
+                "signal": "bullish",
+                "confidence": 85,
+                "reasoning": [
+                    "Strong ROE of 28.5%",
+                    "Revenue growth: +15.3% YoY",
+                    "Net margin improving: 21.2%",
+                    "P/E ratio: 25.3 (fair value)",
+                    "iPhone 15 driving strong demand",
+                    "Services revenue at all-time high",
+                ],
+                "metrics": {
+                    "ROE": "28.5%",
+                    "Revenue Growth": "+15.3%",
+                    "Net Margin": "21.2%",
+                    "P/E Ratio": "25.3",
+                },
+            },
+            "price": 182.50,
+            "dcf_value": 195.50,
+            "upside": 7.1,
+            "rl_consensus": "BUY",
+            "rl_votes": {"BUY": 3, "SELL": 1, "HOLD": 1},
+            "final_signal": "BUY",
+            "final_confidence": 82,
+            "final_quantity": 75,
+        },
+        "TSLA": {
+            "Fundamentals": {
+                "signal": "bearish",
+                "confidence": 62,
+                "reasoning": [
+                    "High valuation: P/E ratio of 68.5",
+                    "Revenue growth slowing: +8.2% YoY",
+                    "Increasing competition in EV market",
+                    "Margin pressure from price cuts",
+                    "Production delays in Cybertruck",
+                    "Market share declining in China",
+                ],
+                "metrics": {
+                    "ROE": "18.2%",
+                    "Revenue Growth": "+8.2%",
+                    "Net Margin": "12.8%",
+                    "P/E Ratio": "68.5",
+                },
+            },
+            "price": 245.80,
+            "dcf_value": 220.30,
+            "upside": -10.4,
+            "rl_consensus": "SELL",
+            "rl_votes": {"BUY": 1, "SELL": 3, "HOLD": 1},
+            "final_signal": "SELL",
+            "final_confidence": 68,
+            "final_quantity": 40,
+        },
+        "GOOGL": {
+            "Fundamentals": {
+                "signal": "bullish",
+                "confidence": 78,
+                "reasoning": [
+                    "Solid ROE of 24.8%",
+                    "Revenue growth: +11.5% YoY",
+                    "AI integration boosting search",
+                    "P/E ratio: 22.1 (undervalued)",
+                    "Cloud revenue growing at +25%",
+                    "YouTube advertising rebounding",
+                ],
+                "metrics": {
+                    "ROE": "24.8%",
+                    "Revenue Growth": "+11.5%",
+                    "Net Margin": "23.5%",
+                    "P/E Ratio": "22.1",
+                },
+            },
+            "price": 140.50,
+            "dcf_value": 158.25,
+            "upside": 12.6,
+            "rl_consensus": "BUY",
+            "rl_votes": {"BUY": 4, "SELL": 0, "HOLD": 1},
+            "final_signal": "BUY",
+            "final_confidence": 88,
+            "final_quantity": 85,
+        },
+    }
+
+    # Default to AAPL if stock not found
+    return analyses.get(stock, analyses["AAPL"])
+
+
 def render_agent_analysis_panel(stock: str):
     """Render detailed agent analysis panel."""
     st.markdown("### 🤖 5-Agent Analysis")
 
-    # Simulate or fetch actual agent results
+    # Get stock-specific analysis
+    stock_analysis = get_stock_specific_analysis(stock)
+
+    # Build agent results with stock-specific fundamentals
     agent_results = {
-        "Fundamentals": {
-            "signal": "bullish",
-            "confidence": 85,
-            "reasoning": [
-                "Strong ROE of 28.5%",
-                "Revenue growth: +15.3% YoY",
-                "Net margin improving: 21.2%",
-                "P/E ratio: 25.3 (fair value)",
-            ],
-            "metrics": {
-                "ROE": "28.5%",
-                "Revenue Growth": "+15.3%",
-                "Net Margin": "21.2%",
-                "P/E Ratio": "25.3",
-            },
-        },
+        "Fundamentals": stock_analysis["Fundamentals"],
         "Technicals": {
             "signal": "bullish",
             "confidence": 78,
@@ -134,19 +216,21 @@ def render_agent_analysis_panel(stock: str):
             },
         },
         "Valuation": {
-            "signal": "bullish",
-            "confidence": 72,
+            "signal": "bullish" if stock_analysis["upside"] > 0 else "bearish",
+            "confidence": 72 if stock_analysis["upside"] > 0 else 65,
             "reasoning": [
-                "DCF intrinsic value: $195.50",
-                "Current price: $182.50",
-                "Upside potential: +7.1%",
-                "Owner earnings positive",
+                f"DCF intrinsic value: ${stock_analysis['dcf_value']:.2f}",
+                f"Current price: ${stock_analysis['price']:.2f}",
+                f"Upside potential: {stock_analysis['upside']:+.1f}%",
+                "Owner earnings positive"
+                if stock_analysis["upside"] > 0
+                else "Trading above fair value",
             ],
             "metrics": {
-                "DCF Value": "$195.50",
-                "Current Price": "$182.50",
-                "Upside": "+7.1%",
-                "Margin of Safety": "12%",
+                "DCF Value": f"${stock_analysis['dcf_value']:.2f}",
+                "Current Price": f"${stock_analysis['price']:.2f}",
+                "Upside": f"{stock_analysis['upside']:+.1f}%",
+                "Margin of Safety": f"{abs(stock_analysis['upside']) / 1.5:.0f}%",
             },
         },
         "Sentiment": {
@@ -244,28 +328,52 @@ def render_rl_ensemble_panel(stock: str):
     """Render RL ensemble analysis panel."""
     st.markdown("### 🧠 RL Ensemble Predictions")
 
-    # Simulate RL model predictions
-    rl_models = {
-        "SAC": {"prediction": 1, "confidence": 82, "action": "BUY"},
-        "PPO": {"prediction": 1, "confidence": 78, "action": "BUY"},
-        "A2C": {"prediction": 0, "confidence": 55, "action": "HOLD"},
-        "DQN": {"prediction": 1, "confidence": 85, "action": "BUY"},
-        "TD3": {"prediction": -1, "confidence": 68, "action": "SELL"},
-    }
+    # Get stock-specific analysis
+    stock_analysis = get_stock_specific_analysis(stock)
+
+    # Create stock-specific RL model predictions based on analysis
+    vote_counts = stock_analysis["rl_votes"]
+
+    # Build models list based on votes
+    rl_models = {}
+    model_names = ["SAC", "PPO", "A2C", "DQN", "TD3"]
+
+    model_idx = 0
+    for action in ["BUY", "SELL", "HOLD"]:
+        count = vote_counts.get(action, 0)
+        prediction_val = 1 if action == "BUY" else -1 if action == "SELL" else 0
+
+        for i in range(count):
+            if model_idx < len(model_names):
+                confidence = 75 + (i * 5) if action == "BUY" else 65 + (i * 3)
+                rl_models[model_names[model_idx]] = {
+                    "prediction": prediction_val,
+                    "confidence": min(confidence, 90),
+                    "action": action,
+                }
+                model_idx += 1
+
+    # Ensure all 5 models are present
+    while model_idx < len(model_names):
+        rl_models[model_names[model_idx]] = {
+            "prediction": 0,
+            "confidence": 55,
+            "action": "HOLD",
+        }
+        model_idx += 1
 
     # Calculate ensemble prediction
     total_prediction = sum([model["prediction"] * 0.2 for model in rl_models.values()])
 
-    if total_prediction > 0.3:
-        ensemble_action = "BUY"
+    ensemble_action = stock_analysis["rl_consensus"]
+
+    if ensemble_action == "BUY":
         ensemble_color = "#28a745"
         ensemble_icon = "🟢"
-    elif total_prediction < -0.3:
-        ensemble_action = "SELL"
+    elif ensemble_action == "SELL":
         ensemble_color = "#dc3545"
         ensemble_icon = "🔴"
     else:
-        ensemble_action = "HOLD"
         ensemble_color = "#ffc107"
         ensemble_icon = "🟡"
 
@@ -371,25 +479,47 @@ def render_portfolio_manager_decision(stock: str):
     """Render final portfolio manager decision."""
     st.markdown("### 🎯 Portfolio Manager Final Decision")
 
-    # Simulate decision making
-    agent_consensus = "bullish"  # From 3 bullish, 0 bearish, 2 neutral
-    rl_signal = "BUY"
+    # Get stock-specific analysis
+    stock_analysis = get_stock_specific_analysis(stock)
 
-    # Calculate final decision
-    final_signal = "BUY"
-    final_confidence = 82
-    final_quantity = 75
-    multiplier = 1.0
+    # Use stock-specific values
+    final_signal = stock_analysis["final_signal"]
+    final_confidence = stock_analysis["final_confidence"]
+    final_quantity = stock_analysis["final_quantity"]
+
+    # Determine consensus based on signal
+    if final_signal == "BUY":
+        agent_consensus = "bullish"
+        multiplier = 1.0
+    elif final_signal == "SELL":
+        agent_consensus = "bearish"
+        multiplier = 0.8
+    else:
+        agent_consensus = "neutral"
+        multiplier = 0.5
+
+    rl_signal = stock_analysis["rl_consensus"]
 
     # Create three columns
     col1, col2, col3 = st.columns(3)
 
+    # Determine colors based on signal
+    if final_signal == "BUY":
+        signal_color = "#28a745"
+        signal_icon = "🟢"
+    elif final_signal == "SELL":
+        signal_color = "#dc3545"
+        signal_icon = "🔴"
+    else:
+        signal_color = "#ffc107"
+        signal_icon = "🟡"
+
     with col1:
         st.markdown(
             f"""
-            <div style="background: linear-gradient(135deg, #28a74522 0%, #28a74511 100%);
-                        padding: 1.5rem; border-radius: 12px; border-left: 5px solid #28a745; text-align: center;">
-                <h2 style="margin: 0; color: #28a745;">🟢 {final_signal}</h2>
+            <div style="background: linear-gradient(135deg, {signal_color}22 0%, {signal_color}11 100%);
+                        padding: 1.5rem; border-radius: 12px; border-left: 5px solid {signal_color}; text-align: center;">
+                <h2 style="margin: 0; color: {signal_color};">{signal_icon} {final_signal}</h2>
                 <p style="margin: 0.5rem 0 0 0; font-size: 1.2rem; font-weight: 600;">Final Signal</p>
             </div>
             """,
@@ -440,9 +570,9 @@ def render_portfolio_manager_decision(stock: str):
 
         **Expected Trade:**
         - Action: {final_signal} {final_quantity} shares of {stock}
-        - Estimated Price: $182.50
-        - Estimated Cost: ${final_quantity * 182.50:,.2f}
-        - Position Impact: +0.{final_quantity}% of portfolio
+        - Estimated Price: ${stock_analysis["price"]:.2f}
+        - Estimated Cost: ${final_quantity * stock_analysis["price"]:,.2f}
+        - Position Impact: {(final_quantity * stock_analysis["price"] / 100000 * 100):.2f}% of portfolio
         """)
 
     # Execute button

@@ -10,7 +10,14 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import numpy as np
 
-# No external dependencies needed - everything is in session state
+# Import simple state manager (NO external dependencies, NO Alpaca)
+try:
+    from ui import simple_state
+
+    STATE_MANAGER = simple_state
+except Exception as e:
+    print(f"Warning: Could not load state manager in portfolio: {e}")
+    STATE_MANAGER = None
 
 
 def render_portfolio_page():
@@ -202,9 +209,9 @@ def render_positions_table():
 
         totals_row = {
             "Symbol": "TOTAL",
-            "Shares": "",  # Empty string instead of "-" to avoid Arrow conversion issues
-            "Avg Cost": "",
-            "Current Price": "",
+            "Shares": "-",
+            "Avg Cost": "-",
+            "Current Price": "-",
             "Market Value": f"${total_market_value:,.2f}",
             "Cost Basis": f"${total_cost_basis:,.2f}",
             "Unrealized P&L": f"${total_unrealized_pnl:+,.2f}",
@@ -244,8 +251,25 @@ def render_trade_history():
     """Render trade history table."""
     st.markdown("### 📜 Recent Trade History")
 
-    # Load trade history from session state
-    trades = st.session_state.get("trade_history", [])
+    # Load trade history from state manager
+    trades = []
+    if STATE_MANAGER is not None:
+        try:
+            trades_data = STATE_MANAGER.get_recent_trades(limit=20)
+            for trade in trades_data:
+                trades.append(
+                    {
+                        "timestamp": datetime.fromisoformat(trade["timestamp"]),
+                        "symbol": trade["symbol"],
+                        "action": trade["action"],
+                        "quantity": trade["quantity"],
+                        "price": trade.get("price", 0),
+                        "total": trade.get("total_value", 0),
+                        "status": "Filled" if trade.get("success", False) else "Failed",
+                    }
+                )
+        except Exception as e:
+            print(f"Could not load trade history: {e}")
 
     # If no trades, show message
     if not trades:
@@ -260,7 +284,7 @@ def render_trade_history():
     df["Qty"] = df["quantity"]
     df["Price"] = df["price"].apply(lambda x: f"${x:.2f}")
     df["Total"] = df["total"].apply(lambda x: f"${x:,.2f}")
-    df["Status"] = "Filled"  # All trades from trade_history are executed
+    df["Status"] = df["status"]
 
     display_df = df[["Time", "Symbol", "Action", "Qty", "Price", "Total", "Status"]]
 
@@ -639,29 +663,9 @@ def render_trade_execution():
             trade_action = st.selectbox("Action", ["BUY", "SELL"])
 
         with col3:
-            # Show max quantity based on action
-            if (
-                trade_action == "SELL"
-                and trade_symbol in st.session_state.portfolio.get("positions", {})
-            ):
-                max_shares = st.session_state.portfolio["positions"][trade_symbol].get(
-                    "shares", 0
-                )
-                trade_quantity = st.number_input(
-                    "Quantity",
-                    min_value=1,
-                    max_value=int(max_shares),
-                    value=min(10, int(max_shares)),
-                    step=1,
-                    help=f"You own {max_shares} shares",
-                )
-            elif trade_action == "SELL":
-                st.info(f"⚠️ You don't own any {trade_symbol} shares")
-                trade_quantity = 0
-            else:
-                trade_quantity = st.number_input(
-                    "Quantity", min_value=1, max_value=1000, value=10, step=1
-                )
+            trade_quantity = st.number_input(
+                "Quantity", min_value=1, max_value=1000, value=10, step=1
+            )
 
         with col4:
             order_type = st.selectbox("Order Type", ["Market", "Limit", "Stop"])
@@ -751,37 +755,139 @@ def execute_manual_trade(
     symbol: str, action: str, quantity: int, order_type: str = "market"
 ):
     """
-    Execute a manual trade - now calls the execute_trade function from app.py.
+    Execute a manual trade and update state manager.
 
     Returns:
         tuple: (success, message, order_id, executed_price)
     """
     import time
 
-    # Import the execute_trade function from parent app module
     try:
-        # Access the execute_trade function from the main app
-        import sys
-        import os
+        # SIMPLE VERSION - Use dummy prices (no yfinance, no Alpaca)
+        dummy_prices = {
+            "AAPL": 182.50,
+            "TSLA": 245.80,
+            "GOOGL": 140.50,
+            "MSFT": 420.15,
+            "AMZN": 175.75,
+            "NVDA": 495.50,
+            "META": 485.30,
+            "NFLX": 625.40,
+            "AMD": 155.20,
+            "INTC": 42.80,
+        }
 
-        # Add parent directory to path to import app
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if parent_dir not in sys.path:
-            sys.path.insert(0, parent_dir)
+        # Get price or use default
+        executed_price = dummy_prices.get(symbol, 100.0)
 
-        # Import trade_utils to avoid set_page_config errors
-        from trade_utils import execute_trade, get_stock_price
-
-        # Call the execute_trade function from trade_utils
-        success, message = execute_trade(st, symbol, action, quantity)
-
-        # Generate order ID
+        # Generate simple order ID
         order_id = f"UI_{symbol}_{action}_{int(time.time())}"
 
-        # Get executed price
-        executed_price = get_stock_price(symbol)
+        # Record the trade using simple state manager
+        if STATE_MANAGER is not None:
+            STATE_MANAGER.add_trade(symbol, action, quantity, executed_price)
 
-        return success, message, order_id, executed_price
+            # Update portfolio in session state
+            current_portfolio = st.session_state.portfolio
+
+            if action == "BUY":
+                # Deduct cash
+                cost = quantity * executed_price
+                current_portfolio["cash"] -= cost
+
+                # Add or update position
+                if symbol in current_portfolio["positions"]:
+                    existing_shares = current_portfolio["positions"][symbol].get(
+                        "shares", 0
+                    )
+                    existing_value = current_portfolio["positions"][symbol].get(
+                        "market_value", 0
+                    )
+
+                    new_shares = existing_shares + quantity
+                    new_avg_cost = (existing_value + cost) / new_shares
+
+                    current_portfolio["positions"][symbol] = {
+                        "shares": new_shares,
+                        "market_value": new_shares * executed_price,
+                        "avg_cost": new_avg_cost,
+                        "current_price": executed_price,
+                        "unrealized_pnl": 0,
+                        "unrealized_pnl_pct": 0,
+                        "day_change": 0,
+                        "day_change_pct": 0,
+                    }
+                else:
+                    current_portfolio["positions"][symbol] = {
+                        "shares": quantity,
+                        "market_value": cost,
+                        "avg_cost": executed_price,
+                        "current_price": executed_price,
+                        "unrealized_pnl": 0,
+                        "unrealized_pnl_pct": 0,
+                        "day_change": 0,
+                        "day_change_pct": 0,
+                    }
+
+                current_portfolio["cost_basis"][symbol] = current_portfolio[
+                    "positions"
+                ][symbol]["market_value"]
+
+            else:  # SELL
+                # Add cash
+                proceeds = quantity * executed_price
+                current_portfolio["cash"] += proceeds
+
+                # Update or remove position
+                if symbol in current_portfolio["positions"]:
+                    existing_shares = current_portfolio["positions"][symbol].get(
+                        "shares", 0
+                    )
+                    new_shares = existing_shares - quantity
+
+                    if new_shares <= 0:
+                        # Remove position completely
+                        del current_portfolio["positions"][symbol]
+                        if symbol in current_portfolio["cost_basis"]:
+                            del current_portfolio["cost_basis"][symbol]
+                    else:
+                        # Update position
+                        current_portfolio["positions"][symbol]["shares"] = new_shares
+                        current_portfolio["positions"][symbol]["market_value"] = (
+                            new_shares * executed_price
+                        )
+
+            # Recalculate total value
+            positions_value = sum(
+                pos.get("market_value", 0)
+                for pos in current_portfolio["positions"].values()
+            )
+            current_portfolio["total_value"] = (
+                current_portfolio["cash"] + positions_value
+            )
+            current_portfolio["total_return"] = (
+                current_portfolio["total_value"] - 100000.0
+            )
+            current_portfolio["total_return_pct"] = (
+                current_portfolio["total_return"] / 100000.0
+            ) * 100
+
+            # Update state manager with new portfolio
+            STATE_MANAGER.update_portfolio(current_portfolio)
+
+            # Also update the trade counts in state
+            state = STATE_MANAGER.load_state()
+            state["total_trades"] = st.session_state.total_trades
+            state["successful_trades"] = st.session_state.successful_trades
+            STATE_MANAGER.save_state(state)
+
+            # Update session state
+            st.session_state.portfolio = current_portfolio
+            st.session_state.total_trades += 1
+            st.session_state.successful_trades += 1
+
+        message = f"Successfully executed {action} {quantity} shares of {symbol} at ${executed_price:.2f}"
+        return True, message, order_id, executed_price
 
     except Exception as e:
         import traceback

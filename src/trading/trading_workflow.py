@@ -18,6 +18,7 @@ from src.trading.alpaca_trader import AlpacaTrader
 from src.trading.portfolio_executor import PortfolioExecutor, TradingDecision
 from src.agents.decision_engine import create_decision_engine
 from src.agents.data_fetcher import get_stock_data
+from src.core.state_manager import get_state_manager
 
 # Configure logging
 logging.basicConfig(
@@ -88,6 +89,22 @@ class TradingWorkflow:
         self.total_trades = 0
         self.successful_trades = 0
 
+        # Initialize state manager for real-time UI sync
+        self.state_manager = get_state_manager()
+        logger.info("✅ State Manager initialized")
+
+        # Update initial settings in state
+        self.state_manager.update_state(
+            settings={
+                "stock_list": tickers,
+                "confidence_threshold": int(min_confidence),
+                "max_position_pct": max_position_pct * 100,
+                "cycle_interval": check_interval,
+                "auto_refresh": True,
+                "refresh_interval": 5,
+            }
+        )
+
         logger.info(f"🚀 Trading Workflow ready for {len(tickers)} tickers")
         logger.info(f"Mode: {'DRY RUN' if dry_run else 'LIVE TRADING'}")
 
@@ -100,6 +117,9 @@ class TradingWorkflow:
         """
         self.cycle_count += 1
         cycle_start = datetime.now()
+
+        # Update cycle count in state
+        self.state_manager.increment_cycle()
 
         logger.info(f"\n{'=' * 80}")
         logger.info(
@@ -122,8 +142,24 @@ class TradingWorkflow:
             logger.info(f"   Cash: ${account['cash']:,.2f}")
             logger.info(f"   Portfolio Value: ${account['portfolio_value']:,.2f}")
             logger.info(f"   Buying Power: ${account['buying_power']:,.2f}")
+
+            # Update system health in state
+            system_health = {
+                "api_status": "Connected",
+                "database_status": "Online",
+                "models_loaded": 5,
+                "total_models": 5,
+                "memory_usage": 45,  # Can be replaced with actual psutil data
+                "cpu_usage": 30,
+            }
+            self.state_manager.update_state(system_health=system_health)
+
         except Exception as e:
             logger.error(f"❌ Failed to get account info: {e}")
+            # Update error status
+            system_health = self.state_manager.get_state().system_health
+            system_health["api_status"] = "Error"
+            self.state_manager.update_state(system_health=system_health)
             return {"status": "error", "error": str(e)}
 
         # Validate portfolio risk
@@ -146,6 +182,33 @@ class TradingWorkflow:
             },
             "cost_basis": {pos.symbol: pos.cost_basis for pos in positions},
         }
+
+        # Update portfolio in state with detailed position info
+        portfolio_state = {
+            "cash": account["cash"],
+            "total_value": account["portfolio_value"],
+            "total_return": account["portfolio_value"]
+            - 100000.0,  # Assuming 100k initial
+            "total_return_pct": ((account["portfolio_value"] - 100000.0) / 100000.0)
+            * 100,
+            "positions": {},
+            "cost_basis": {},
+        }
+
+        for pos in positions:
+            portfolio_state["positions"][pos.symbol] = {
+                "shares": pos.quantity,
+                "market_value": pos.market_value,
+                "avg_cost": pos.avg_entry_price,
+                "current_price": pos.current_price,
+                "unrealized_pnl": pos.unrealized_pl,
+                "unrealized_pnl_pct": pos.unrealized_plpc * 100,
+                "day_change": pos.change_today,
+                "day_change_pct": pos.unrealized_intraday_plpc * 100,
+            }
+            portfolio_state["cost_basis"][pos.symbol] = pos.cost_basis
+
+        self.state_manager.update_portfolio(portfolio_state)
 
         # Analyze each ticker
         decisions = {}
@@ -212,6 +275,22 @@ class TradingWorkflow:
                 logger.info(f"   Quantity: {final_decision['quantity']}")
                 logger.info(f"   Reasoning: {final_decision.get('reasoning', 'N/A')}")
 
+                # Add decision to state
+                current_price = (
+                    stock_data["Close"].iloc[-1] if not stock_data.empty else 0
+                )
+                self.state_manager.add_decision(
+                    {
+                        "symbol": ticker,
+                        "signal": final_decision["signal"],
+                        "confidence": final_decision["confidence"],
+                        "quantity": final_decision["quantity"],
+                        "price": current_price,
+                        "reasoning": final_decision.get("reasoning", "N/A"),
+                        "executed": False,  # Will be updated after execution
+                    }
+                )
+
             except Exception as e:
                 logger.error(f"❌ Error analyzing {ticker}: {e}")
                 cycle_results["errors"].append(f"Error analyzing {ticker}: {str(e)}")
@@ -234,6 +313,24 @@ class TradingWorkflow:
                 if result.success and result.action in ["BUY", "SELL"]:
                     self.successful_trades += 1
                 self.total_trades += 1
+
+                # Record trade execution in state
+                self.state_manager.add_trade_execution(
+                    {
+                        "symbol": ticker,
+                        "action": result.action,
+                        "quantity": result.executed_quantity,
+                        "price": result.executed_price
+                        if hasattr(result, "executed_price")
+                        else 0,
+                        "total_value": result.executed_quantity * result.executed_price
+                        if hasattr(result, "executed_price")
+                        else 0,
+                        "success": result.success,
+                        "error_message": result.error_message,
+                        "order_id": result.order_id,
+                    }
+                )
 
         # Print cycle summary
         logger.info(f"\n{'=' * 80}")
